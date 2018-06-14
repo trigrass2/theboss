@@ -1,2 +1,3 @@
-./build_dir
-./staging_dir
+build_dir/
+staging_dir/
+src/
