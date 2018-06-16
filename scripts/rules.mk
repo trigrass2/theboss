@@ -78,16 +78,15 @@ $(eval _PKG_CXXFLAGS:=$(TARGET_CXXFLAGS) $(PKG_CXXFLAGS) -I $(TARGET_STAGING_DIR
 $(eval _PKG_LDFLAGS:=$(MANDATORY_LDFLAGS) $(TARGET_LDFLAGS) $(PKG_LDFLAGS) -L $(TARGET_STAGING_DIR)/lib)
 $(eval _PKG_LDADD:=$(MANDATORY_LDADD) $(TARGET_LDADD) $(PKG_LDADD))
 $(eval _PKG_CONFIGURE_OPTIONS:=$(TARGET_CONFIGURE_OPTIONS) $(PKG_CONFIGURE_OPTIONS))
-$(eval _PKG_DEPENDS:=$(foreach DEP,$(PKG_DEPENDS),package/$(DEP)/$(1)/install))
-$(eval _PKG_DEPENDS+=$(foreach DEP,$(TARGET_DEPENDS),package/$(DEP)/$(1)/install))
-$(info "Package $(2) depends on $(PKG_DEPEND_BUILD_TARGETS)")
+$(eval _PKG_DEPENDS:=$(foreach DEP,$(PKG_DEPENDS),package/$(DEP)/$(1)/install) $(foreach DEP,$(TARGET_DEPENDS),package/$(DEP)/$(1)/install))
+$(info Package $(2) depends on $(_PKG_DEPENDS))
 $(PKG_BUILD_DIR): $(_PKG_DEPENDS)
 	@mkdir -p $(PKG_BUILD_DIR)
 	@echo "Configuring target $(2) for $(1)."
 	(cd $(PKG_BUILD_DIR) && $(PKG_SOURCE_DIR)/configure --build=`uname -m` --host="$(TARGET_ARCH)" $(_PKG_CONFIGURE_OPTIONS) CFLAGS="$(_PKG_CFLAGS)" LDFLAGS="$(_PKG_LDFLAGS)" LDADD="$(_PKG_LDADD)" --prefix "$(TARGET_STAGING_DIR)" && touch $(PKG_BUILD_DIR)/.configured)
 $(PKG_BUILD_DIR)/.built: $(PKG_BUILD_DIR)
 	@echo "Building target $(2) for $(1). Depends on $(4)"
-	(cd $(PKG_BUILD_DIR) && make && touch $(PKG_BUILD_DIR)/.built)
+	(cd $(PKG_BUILD_DIR) && make)
 $(PKG_BUILD_DIR)/.installed: $(PKG_BUILD_DIR)/.built
 	(cd $(PKG_BUILD_DIR) && make install && touch $(PKG_BUILD_DIR)/.installed)
 $(PKG_BUILD_DIR)/.unconfigure:
