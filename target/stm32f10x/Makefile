@@ -10,5 +10,10 @@ define target/naze32/configure
     TARGET_CFLAGS+=-DSTM32F10X_MD -DHSE_VALUE=8000000
 endef
 
+define target/stm32duino/configure
+    $(eval $(call target/stm32f10x/configure))
+    TARGET_CFLAGS+=-DSTM32F10X_MD -DHSE_VALUE=8000000
+endef
 
 $(eval $(call DefineTarget,naze32))
+$(eval $(call DefineTarget,stm32duino))

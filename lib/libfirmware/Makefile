@@ -15,4 +15,12 @@ define package/libfirmware/naze32/configure
 	PKG_CONFIGURE_OPTIONS:=--with-target=stm32f10x
 endef
 
+define package/libfirmware/stm32duino/configure
+	PKG_CONFIGURE_OPTIONS:=--with-target=stm32f10x
+endef
+
+define package/libfirmware/motordriver-v2/configure
+	PKG_CONFIGURE_OPTIONS:=--with-target=stm32f407
+endef
+
 $(eval $(call DefinePackage,libfirmware))

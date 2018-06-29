@@ -8,6 +8,10 @@ define target/f429_discovery/configure
     $(eval $(call target/stm32f4xx/configure))
 endef
 
+define target/motordriver-v2/configure
+    $(eval $(call target/stm32f4xx/configure))
+endef
 
 $(eval $(call DefineTarget,stm32f4xx))
 $(eval $(call DefineTarget,f429_discovery))
+$(eval $(call DefineTarget,motordriver-v2))
