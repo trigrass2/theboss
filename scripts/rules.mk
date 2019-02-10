@@ -80,23 +80,24 @@ $(eval _PKG_LDADD:=$(MANDATORY_LDADD) $(TARGET_LDADD) $(PKG_LDADD))
 $(eval _PKG_CONFIGURE_OPTIONS:=$(TARGET_CONFIGURE_OPTIONS) $(PKG_CONFIGURE_OPTIONS))
 $(eval _PKG_DEPENDS:=$(foreach DEP,$(PKG_DEPENDS),package/$(DEP)/$(1)/install) $(foreach DEP,$(TARGET_DEPENDS),package/$(DEP)/$(1)/install))
 $(info Package $(2) depends on $(_PKG_DEPENDS))
-$(PKG_BUILD_DIR): $(_PKG_DEPENDS)
-	@mkdir -p $(PKG_BUILD_DIR)
+$(PKG_BUILD_DIR)/.configured: 
+	@[ -d $(PKG_BUILD_DIR) ] || mkdir -p $(PKG_BUILD_DIR)
 	@echo "Configuring target $(2) for $(1)."
 	(cd $(PKG_BUILD_DIR) && $(PKG_SOURCE_DIR)/configure --build=`uname -m` --host="$(TARGET_ARCH)" $(_PKG_CONFIGURE_OPTIONS) CFLAGS="$(_PKG_CFLAGS)" LDFLAGS="$(_PKG_LDFLAGS)" LDADD="$(_PKG_LDADD)" --prefix "$(TARGET_STAGING_DIR)" && touch $(PKG_BUILD_DIR)/.configured)
-$(PKG_BUILD_DIR)/.built: $(PKG_BUILD_DIR)
+$(PKG_BUILD_DIR)/.built: $(PKG_BUILD_DIR)/.configured $(_PKG_DEPENDS)
 	@echo "Building target $(2) for $(1). Depends on $(4)"
-	(cd $(PKG_BUILD_DIR) && make)
+	$(Q)$(MAKE) -C $(PKG_BUILD_DIR) && touch $(PKG_BUILD_DIR)/.built
 $(PKG_BUILD_DIR)/.installed: $(PKG_BUILD_DIR)/.built
 	(cd $(PKG_BUILD_DIR) && make install && touch $(PKG_BUILD_DIR)/.installed)
 $(PKG_BUILD_DIR)/.unconfigure:
 	rm $(PKG_BUILD_DIR)/.configured
-package/$(2)/$(1)/configure: $(PKG_BUILD_DIR)/.unconfigure $(PKG_BUILD_DIR)/.configured
+package/$(2)/$(1)/configure: $(PKG_BUILD_DIR)/.configured
 package/$(2)/$(1)/compile: $(BUILD_DIR)/$(1)/$(2)/.installed
 	@echo "$(2)/$(1) compiled";
 package/$(2)/$(1)/install: package/$(2)/$(1)/compile
+	$(call package/$(2)/$(1)/flash)
 	@echo "$(2)/$(1)/installed";
-PKG_BUILD_TARGETS+=package/$(2)/$(1)/compile
+PKG_BUILD_TARGETS+=package/$(2)/$(1)/compile package/$(2)/$(1)/build package/$(2)/$(1)/install
 endef
 
 define ResetPackageOptions
