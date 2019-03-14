@@ -66,6 +66,7 @@ endef
 define define_package_target
 $(eval $(call ResetTargetOptions,$(1)))
 $(eval $(call target/$(1)/configure))
+TARGET_TOOL_PREFIX:=$(TARGET_ARCH)-
 $(eval $(call ResetPackageOptions,$(1)))
 $(eval $(call package/$(2)/configure))
 ifdef package/$(2)/$(1)/configure
@@ -83,19 +84,16 @@ $(info Package $(2) depends on $(_PKG_DEPENDS))
 $(PKG_BUILD_DIR)/.configured: 
 	@[ -d $(PKG_BUILD_DIR) ] || mkdir -p $(PKG_BUILD_DIR)
 	@echo "Configuring target $(2) for $(1)."
-	(cd $(PKG_BUILD_DIR) && $(PKG_SOURCE_DIR)/configure --build=`uname -m` --host="$(TARGET_ARCH)" $(_PKG_CONFIGURE_OPTIONS) CFLAGS="$(_PKG_CFLAGS)" LDFLAGS="$(_PKG_LDFLAGS)" LDADD="$(_PKG_LDADD)" --prefix "$(TARGET_STAGING_DIR)" && touch $(PKG_BUILD_DIR)/.configured)
-$(PKG_BUILD_DIR)/.built: $(PKG_BUILD_DIR)/.configured $(_PKG_DEPENDS)
-	@echo "Building target $(2) for $(1). Depends on $(4)"
-	$(Q)$(MAKE) -C $(PKG_BUILD_DIR) && touch $(PKG_BUILD_DIR)/.built
-$(PKG_BUILD_DIR)/.installed: $(PKG_BUILD_DIR)/.built
-	(cd $(PKG_BUILD_DIR) && make install && touch $(PKG_BUILD_DIR)/.installed)
+	(cd $(PKG_BUILD_DIR) && $(PKG_SOURCE_DIR)/configure INSTALL="$(shell which install) -C" --build=`uname -m` --host="$(TARGET_ARCH)" $(_PKG_CONFIGURE_OPTIONS) CFLAGS="$(_PKG_CFLAGS)" LDFLAGS="$(_PKG_LDFLAGS)" LDADD="$(_PKG_LDADD)" --prefix "$(TARGET_STAGING_DIR)" && touch $(PKG_BUILD_DIR)/.configured)
 $(PKG_BUILD_DIR)/.unconfigure:
 	rm $(PKG_BUILD_DIR)/.configured
 package/$(2)/$(1)/configure: $(PKG_BUILD_DIR)/.configured
-package/$(2)/$(1)/compile: $(BUILD_DIR)/$(1)/$(2)/.installed
+package/$(2)/$(1)/compile: $(_PKG_DEPENDS) package/$(2)/$(1)/configure
+	$(Q)$(MAKE) -C $(PKG_BUILD_DIR)
 	@echo "$(2)/$(1) compiled";
 package/$(2)/$(1)/install: package/$(2)/$(1)/compile
 	$(call package/$(2)/$(1)/flash)
+	(cd $(PKG_BUILD_DIR) && make install)
 	@echo "$(2)/$(1)/installed";
 PKG_BUILD_TARGETS+=package/$(2)/$(1)/compile package/$(2)/$(1)/build package/$(2)/$(1)/install
 endef
@@ -111,20 +109,6 @@ PKG_SOURCE_DIR:=
 PKG_BUILD_TARGETS:=
 PKG_CONFIGURE_OPTIONS:=
 PKG_DEPEND_BUILD_TARGETS:=
-endef
-
-# (1): target
-# (2): package
-define define_firmware_targets
-firmware/$(2)/$(1)/compile: package/$(2)/$(1)/compile
-firmware/$(2)/$(1)/install: package/$(2)/$(1)/install
-endef
-
-# (1): firmware
-define DefineFirmware
-$(foreach TARGET,$(ALL_TARGETS),$(eval $(call define_package_target,$(TARGET),$(1),$(PKG_DEPENDS),$(TOP_DIR)/firmware/$(1)/Makefile)))
-.PHONY+=$(PKG_BUILD_TARGETS)
-BUILD_TARGETS+=firmware/$(1)/compile
 endef
 
 # (1): package
