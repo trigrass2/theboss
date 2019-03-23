@@ -1,9 +1,3 @@
-[submodule "src/bossinit"]
-	path = src/bossinit
-	url = https://github.com/mkschreder/bossinit.git
-[submodule "src/libcanopen"]
-	path = src/libcanopen
-	url = https://github.com/mkschreder/libcanopen.git
 [submodule "src/libdriver"]
 	path = src/libdriver
 	url = https://github.com/mkschreder/libdriver.git
@@ -13,3 +7,9 @@
 [submodule "src/libfirmware"]
 	path = src/libfirmware
 	url = https://github.com/mkschreder/libfirmware.git
+[submodule "src/libcanopen"]
+	path = src/libcanopen
+	url = https://github.com/mkschreder/libcanopen.git
+[submodule "src/bossinit"]
+	path = src/bossinit
+	url = https://github.com/mkschreder/bossinit.git
