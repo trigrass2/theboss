@@ -89,8 +89,7 @@ $(PKG_BUILD_DIR)/.unconfigure:
 	rm $(PKG_BUILD_DIR)/.configured
 package/$(2)/$(1)/configure: $(PKG_BUILD_DIR)/.configured
 package/$(2)/$(1)/compile: $(_PKG_DEPENDS) package/$(2)/$(1)/configure
-	$(Q)$(MAKE) -C $(PKG_BUILD_DIR)
-	@echo "$(2)/$(1) compiled";
+	$(Q)$(MAKE) $(PKG_MAKE_FLAGS) -C $(PKG_BUILD_DIR)
 package/$(2)/$(1)/install: package/$(2)/$(1)/compile
 	$(call package/$(2)/$(1)/flash)
 	(cd $(PKG_BUILD_DIR) && make install)
@@ -109,6 +108,7 @@ PKG_SOURCE_DIR:=
 PKG_BUILD_TARGETS:=
 PKG_CONFIGURE_OPTIONS:=
 PKG_DEPEND_BUILD_TARGETS:=
+PKG_MAKE_FLAGS:=
 endef
 
 # (1): package
