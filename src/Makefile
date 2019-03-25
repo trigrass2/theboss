@@ -18,7 +18,7 @@ define package/libfirmware/configure
 	PKG_CONFIGURE_OPTIONS:=--with-target=$(TARGET_PLATFORM)
 endef
 
-define package/boss/configure
+define package/bossinit/configure
 	PKG_SOURCE_DIR:=$(SRC_TOP_DIR)/bossinit
 	PKG_VERSION:=1.0
 	PKG_DEPENDS:=libfirmware libdriver
@@ -29,5 +29,5 @@ $(eval $(call DefinePackage,libdriver))
 $(eval $(call DefinePackage,libfdt))
 $(eval $(call DefinePackage,libcanopen))
 $(eval $(call DefinePackage,libfirmware))
-$(eval $(call DefinePackage,boss))
+$(eval $(call DefinePackage,bossinit))
 
