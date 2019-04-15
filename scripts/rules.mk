@@ -2,10 +2,11 @@ ALL_TARGETS:=
 MANDATORY_CFLAGS:=\
 	-Wall -Wextra -Werror\
 	-g \
-	-Os -ffunction-sections -fdata-sections\
+	-O3 -ffunction-sections -fdata-sections\
 	-std=gnu11\
 	-pedantic \
 	-Wchar-subscripts\
+	-Wno-strict-overflow\
 	-Wformat\
 	-Wformat-nonliteral\
 	-Wformat-security\
@@ -35,6 +36,7 @@ MANDATORY_CFLAGS:=\
 	-Wlong-long\
 	-Wchar-subscripts
 MANDATORY_LDFLAGS:=\
+	-Wl,-flto\
 	-Wl,--gc-sections
 
 define ResetTargetOptions
