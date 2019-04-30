@@ -1,0 +1,138 @@
+#!/bin/bash
+
+set -e
+
+BOSS_DIR=$(dirname $(readlink -f "$0"))
+OUTPUT_PATH=
+INPUT_FILES=()
+while [[ $# -gt 0 ]]
+do
+key="$1"
+
+case $key in
+    -o|--output)
+    OUTPUT_PATH="$2"
+    shift; shift;
+    ;;
+    *)    # unknown option
+    INPUT_FILES+=("$1") # save it in an array for later
+    shift # past argument
+    ;;
+esac
+done
+set -- "${INPUT_FILES[@]}" # restore positional parameters
+
+echo "Boss dir: ${BOSS_DIR}"
+echo "Inputs: ${INPUT_FILES}"
+echo "Output: ${OUTPUT_PATH}"
+
+get_param(){
+    echo $(grep "\!+$2:" "$1" | sed 's/\/\/!+'${2}': \(.*\)/\1/g')
+}
+
+BOSS_INPUT_FILE=${INPUT_FILES}
+BOSS_OUTPUT_FILE=${OUTPUT_PATH}
+BOSS_TMP_DIR=/tmp/theboss
+
+BOSS_BASE_NAME=$(basename -- ${BOSS_INPUT_FILE})
+BOSS_INPUT_FILE_NOEXT=${BOSS_BASE_NAME%.*}
+BOSS_TARGET_DEPENDS=$(get_param ${BOSS_INPUT_FILE} "DEPENDS")
+BOSS_TARGET_CFLAGS=$(get_param ${BOSS_INPUT_FILE} "CFLAGS")
+BOSS_TARGET_LDFLAGS=$(get_param ${BOSS_INPUT_FILE} "LDLAGS")
+BOSS_TARGET_LDADD=$(get_param ${BOSS_INPUT_FILE} "LDADD")
+BOSS_TARGET_HOST=$(get_param ${BOSS_INPUT_FILE} "HOST")
+BOSS_TARGET_TARGET=$(get_param ${BOSS_INPUT_FILE} "TARGET")
+
+BOSS_STAGING_DIR=${BOSS_TMP_DIR}/staging/${BOSS_INPUT_FILE_NOEXT}/${BOSS_TARGET_TARGET}
+BOSS_BUILD_DIR=${BOSS_TMP_DIR}/build/${BOSS_INPUT_FILE_NOEXT}/${BOSS_TARGET_TARGET}
+
+BOSS_CFLAGS="\
+	-Wall -Wextra -Werror\
+	-g \
+	-O3 -ffunction-sections -fdata-sections\
+	-std=gnu11\
+	-pedantic \
+	-Wchar-subscripts\
+	-Wno-strict-overflow\
+	-Wformat\
+	-Wformat-nonliteral\
+	-Wformat-security\
+	-Wmissing-braces\
+	-Wparentheses\
+	-Wsequence-point\
+	-Wswitch\
+	-Wtrigraphs\
+	-Wno-unused-function\
+	-Wunused-label\
+	-Wno-unused-parameter\
+	-Wunused-variable\
+	-Wunused-value\
+	-Wuninitialized\
+	-Wdiv-by-zero\
+	-Wfloat-equal\
+	-Wdouble-promotion\
+	-fsingle-precision-constant\
+	-Wshadow\
+	-Wpointer-arith\
+	-Wwrite-strings\
+	-Wconversion\
+	-Wredundant-decls\
+	-Wunreachable-code\
+	-Winline\
+	-Wenum-compare \
+	-Wlong-long\
+	-Wchar-subscripts\
+    -I${BOSS_STAGING_DIR}/include/"
+
+BOSS_LDFLAGS="\
+	-Wl,-flto\
+	-Wl,--gc-sections\
+    -L${BOSS_STAGING_DIR}/lib"
+
+BOSS_LDADD="\
+    $(echo ${BOSS_TARGET_DEPENDS} | sed 's/lib/-l/g')"
+
+mkdir -p ${BOSS_BUILD_DIR}
+mkdir -p ${BOSS_STAGING_DIR}
+
+BOSS_INPUT_FILE=$(realpath ${INPUT_FILES})
+BOSS_TARGET_DEPENDS="${BOSS_TARGET_DEPENDS} bossinit"
+
+for LIB_NAME in ${BOSS_TARGET_DEPENDS}; do
+if [ -d ${PWD}/${LIB_NAME} ]; then
+    LIB_SOURCE_DIR=${PWD}/${LIB_NAME}
+else
+    LIB_SOURCE_DIR=${BOSS_DIR}/src/${LIB_NAME}
+fi
+LIB_BUILD_DIR=${BOSS_BUILD_DIR}/${LIB_NAME}
+(
+    if [ ! -d ${LIB_BUILD_DIR} ]; then
+        mkdir -p ${LIB_BUILD_DIR}
+        cd  ${LIB_BUILD_DIR}
+        ${LIB_SOURCE_DIR}/configure\
+            INSTALL=$(which install) -C \
+            --build=$(uname -m)\
+            --host="${BOSS_TARGET_HOST}"\
+            --with-target="${BOSS_TARGET_TARGET}"\
+            --with-devicetree="${BOSS_INPUT_FILE}"\
+            --with-drivers=""\
+            --with-libs="${BOSS_LDADD}"\
+            CFLAGS="${BOSS_CFLAGS} ${BOSS_TARGET_CFLAGS}"\
+            LDFLAGS="${BOSS_LDFLAGS} ${BOSS_TARGET_LDFLAGS}"\
+            LDADD="${BOSS_LDADD} ${BOSS_TARGET_LDADD}"\
+            --prefix="${BOSS_STAGING_DIR}"
+    fi
+    cd  ${LIB_BUILD_DIR}
+    make
+    make install
+)
+done
+
+${BOSS_TARGET_HOST}-size ${BOSS_STAGING_DIR}/bin/theboss
+
+# copy the binary file to the build directory
+if [ "${BOSS_OUTPUT_FILE##*.}" = "bin" ]; then
+   ${BOSS_TARGET_HOST}-objcopy -O binary ${BOSS_STAGING_DIR}/bin/theboss ${BOSS_OUTPUT_FILE}
+elif [ "${BOSS_OUTPUT_FILE##*.}" = "hex" ]; then
+   ${BOSS_TARGET_HOST}-objcopy -O ihex ${BOSS_STAGING_DIR}/bin/theboss ${BOSS_OUTPUT_FILE}
+fi

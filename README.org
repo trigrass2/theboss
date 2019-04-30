@@ -1,0 +1,168 @@
+#+TITLE: README
+
+* TheBOSS
+TheBOSS is my toolkit for creating embedded software. It consists of a
+collection of crossplatform libraries that build for a variety of systems and
+targets. All components are bound together using the device tree.
+* Concepts
+** Target
+A target is a set of instructions on how to generate the code and how to link
+it. This is not go be confused with board or core type. This is best seen as a
+set of instructions on how to generate code.
+
+So what constitutes these instructions:
+1) Toolchain to be used
+2) Flags specifying core family (ie cortex-m4)
+3) Flags specifying coprocessor type (ie FPU model)
+4) Flags that determine whether soft or hard floating point is used
+5) Linker script parameters
+6) Linker script to be used
+** Product
+A product is a set of hardware devices for which all necessary software can be
+packaged as a single image. A product can have:
+
+1) Main CPU board with oscillator, interfaces etc.
+2) Other devices connected to the main board over any interface
+
+This means that a product is in fact not just the hardware product but the
+collection of electronic devices. The key point here is that, as far as the
+build system is concerned, an image constitutes all software needed to make this
+combination of devices work as defined in the product specification.
+** Image
+An image is a set of resources bundled together into a flashable image for a
+product. Note that this can be any kind of file. It is simply a single file that
+is the output of the build process which can then be interpreted by some type of
+application installed. What are some examples of an image?
+
+1) Intel hex file containing the firmware
+2) Binary firmware file
+3) A file that contains both code and other resources appended to it (such as
+   devicetree)
+4) A zip/tar/whatever archive containing files that some type of installer can
+   interpret and correctly upgrade the software on the board.
+** Specification
+A product specification is a set of requirements for how a product should
+operate. These requirements must be verifiable automatically as part of the
+build process. The build system takes care of the verification step.
+
+Typical requirements:
+1) Software requirements
+   - When user preses button x, some sequence of events should take place that
+     after time t produce the effect y.
+   - Given input data x, a piece of code must produce output data y
+2) Electrical requirements
+   These requirements target the hardware itself. In order to meet these
+   requirements automatically, a test setup is necessary that can hook up to
+   test points on the product (these have to be present in the first place -
+   otherwise requirement can not be tested automatically).
+
+   Some examples of these are:
+   - When power is turned on, all regulators should turn on in desired sequence
+     and have noise levels and overshoot levels under a specified level.
+   - When power is turned a certain sequence of events is expected to happen on
+     the CAN bus when each device goes online and then master starts sending
+     sync requests to which all slaves must reply.
+
+Specifications are verified through the use of scripted tests. These tests do
+not need to be targeted at application code itself. They can be written in
+python and target certain communication channels or they can run on dedicated
+hardware and relay results to the build system.
+
+The key point here is that a product always has a specification attached to it
+and it is the job of the build system to ensure that the specification is met at
+all times during the development and deployment cycle.
+** Build system
+A build system is a collection of scripts that are designed to produce correct
+software image for a specific product and verify it according to the product
+specification. The build system takes one product definition as input and
+compiles an image according to that specification as output. If any constraints
+are not met then the build system should not produce an image at all.
+
+Thus the build system works as a high level compiler that operates at the level
+of abstract specification and corresponding automatic quality assurance tests.
+
+Inputs to the build system:
+1) Devicetree describing product hardware
+2) A target definition specifying code generation options
+3) A specification with constraints that the firmware must be validated against
+
+Outputs are:
+1) Firmware image for the above definition
+2) A compliance report
+* General concepts
+The boss build system aims to do all the work required to be the most
+straightforward build system for producing and verifying an image for a product.
+It achieves this through the application of a few powerful concepts.
+** Make use of existing build scripts
+This is important because we want to leverage as much as possible the scripts
+that are already present in a library package for building that particular
+library. For this we need to:
+1) Avoid building our code in the same tree as the source code of a library.
+   This is because we want to build for several targets and we don't want to
+   pollute the source tree with any intermediate files. The library must thus
+   support specifying object file prefix so that object files can be placed
+   elsewhere. Most standard build systems support this.
+2) Supply all of our cross compilation options to the library specific build
+   files. The library build scripts must thus support doing the following (again
+   most build systems, if used properly, support this out of the box):
+   1. Passing of CFLAGS
+   2. Passing of LDFLAGS
+   3. Passing of ARCH (ie arm-none-eabi-) to be appended in front of all
+      compiler tool names.
+   4. Not use any build options internally that are targeted at some specific
+      target (this is mostly down to library writer)
+** Build as libraries
+The build system must be able to explicitly link in certain methods if it
+identifies that they are necessary to make certain device tree work. This
+includes explicitly specifying symbols to be included using =-Wl,-u,<symname>=
+in order to force linker to include these symbols from =.a= libraries.
+** Install each package
+After building each subproject library, the build system will install the
+libraries in a staging directory just like they would be installed on any other
+system. It is then from the staging directory that all the dependency library
+header files are included.
+* Components
+** Schedulers
+TheBOSS uses a lightweight thread abstraction layer on that currently runs on
+top of FreeRTOS and libpthread. FreeRTOS and the architectures that it supports
+is the primary build target. Since FreeRTOS and pthreads do not generally work
+the same way, some hacks are necessary to make the code behave roughly the same
+on pthreads as it does on FreeRTOS. The pthread build is therefore there only
+for testing general functionality. It is not guaranteed to behave the same way.
+** Build system
+The buildsystem is written in Make. The main file:Makefile includes
+file:scripts/rules.mk and then includes other makefiles from the subdirectories.
+All external libraries should be placed as standalone projects under src
+directory and included into the main tree as git submodules.
+
+Simply running make from the main folder will build theboss executables for
+every platform that is supported by default. These default builds will try to
+enable all devices present on the platform and sometimes have some demo code
+running. Note however that these are just demo builds and the typical way to
+build theboss for a real project is to invoke make from outside of the main tree
+and to supply PROJECT=<project source directory> variable to the make process.
+This will include that project into the build along with any custom targets and
+device tree files and then build a firmware that will include everything
+required for that particular project.
+** Applications
+All applications in TheBOSS system are follow the same structure as device
+drivers. An application is simply a device driver that starts a thread that runs
+in the background and is responsible for the tasks of that application.
+Everything else is done exactly as for any other device driver. The application
+is then included into the build using a device tree directive that loads the
+driver inside which the application is defined.
+* Usage
+** Building an image
+=bossc=  command is the main compiler used to compile the firmware. It is
+invoked as follows:
+
+#+BEGIN_SRC sh
+bossc firmware.dts -o firmware.bin
+#+END
+
+There is quite a lot going on under the hood. First bossc scans the image for
+parameters. These are extracted from special comments and specify various
+compilation flags and link options
+** Creating a project
+** Adding libraries
+** Adding custom targets
