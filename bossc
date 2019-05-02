@@ -14,6 +14,14 @@ case $key in
     OUTPUT_PATH="$2"
     shift; shift;
     ;;
+    -c|--configure)
+    OPT_CONFIGURE="y"
+    shift;
+    ;;
+    -w|--write)
+    OPT_INSTALL="y"
+    shift;
+    ;;
     *)    # unknown option
     INPUT_FILES+=("$1") # save it in an array for later
     shift # past argument
@@ -21,10 +29,6 @@ case $key in
 esac
 done
 set -- "${INPUT_FILES[@]}" # restore positional parameters
-
-echo "Boss dir: ${BOSS_DIR}"
-echo "Inputs: ${INPUT_FILES}"
-echo "Output: ${OUTPUT_PATH}"
 
 get_param(){
     echo $(grep "\!+$2:" "$1" | sed 's/\/\/!+'${2}': \(.*\)/\1/g')
@@ -34,6 +38,11 @@ BOSS_INPUT_FILE=${INPUT_FILES}
 BOSS_OUTPUT_FILE=${OUTPUT_PATH}
 BOSS_TMP_DIR=/tmp/theboss
 
+if [ -z ${BOSS_INPUT_FILE} ]; then
+    echo "No input files";
+    exit 1
+fi
+
 BOSS_BASE_NAME=$(basename -- ${BOSS_INPUT_FILE})
 BOSS_INPUT_FILE_NOEXT=${BOSS_BASE_NAME%.*}
 BOSS_TARGET_DEPENDS=$(get_param ${BOSS_INPUT_FILE} "DEPENDS")
@@ -42,6 +51,9 @@ BOSS_TARGET_LDFLAGS=$(get_param ${BOSS_INPUT_FILE} "LDLAGS")
 BOSS_TARGET_LDADD=$(get_param ${BOSS_INPUT_FILE} "LDADD")
 BOSS_TARGET_HOST=$(get_param ${BOSS_INPUT_FILE} "HOST")
 BOSS_TARGET_TARGET=$(get_param ${BOSS_INPUT_FILE} "TARGET")
+BOSS_TARGET_CMD_FLASH=$(get_param ${BOSS_INPUT_FILE} "CMD_FLASH")
+# get all compatible strings from the dts and include only the drivers that we need
+BOSS_TARGET_DRIVERS_LDADD="-Wl,"$(grep compatible ${BOSS_INPUT_FILE} | sed 's+.*".*,\(.*\)";+-u,\1_ko+g' | sort | uniq | paste -sd "," -)
 
 BOSS_STAGING_DIR=${BOSS_TMP_DIR}/staging/${BOSS_INPUT_FILE_NOEXT}/${BOSS_TARGET_TARGET}
 BOSS_BUILD_DIR=${BOSS_TMP_DIR}/build/${BOSS_INPUT_FILE_NOEXT}/${BOSS_TARGET_TARGET}
@@ -90,6 +102,7 @@ BOSS_LDFLAGS="\
     -L${BOSS_STAGING_DIR}/lib"
 
 BOSS_LDADD="\
+    ${BOSS_TARGET_DRIVERS_LDADD}\
     $(echo ${BOSS_TARGET_DEPENDS} | sed 's/lib/-l/g')"
 
 mkdir -p ${BOSS_BUILD_DIR}
@@ -105,17 +118,24 @@ else
     LIB_SOURCE_DIR=${BOSS_DIR}/src/${LIB_NAME}
 fi
 LIB_BUILD_DIR=${BOSS_BUILD_DIR}/${LIB_NAME}
+LIB_OPT_CONFIGURE=${OPT_CONFIGURE}
 (
     if [ ! -d ${LIB_BUILD_DIR} ]; then
         mkdir -p ${LIB_BUILD_DIR}
+        LIB_OPT_CONFIGURE="y"
+    fi
+    if [ ! -z ${LIB_OPT_CONFIGURE} ]; then
         cd  ${LIB_BUILD_DIR}
+        # this can sometimes fail if configure script was not run properly previously so we ignore any errors
+        make clean distclean || true
+        # we use install -C so that we only install changed files when building libs and not have to recompile everything
         ${LIB_SOURCE_DIR}/configure\
-            INSTALL=$(which install) -C \
+            INSTALL="$(which install) -C" \
             --build=$(uname -m)\
             --host="${BOSS_TARGET_HOST}"\
             --with-target="${BOSS_TARGET_TARGET}"\
             --with-devicetree="${BOSS_INPUT_FILE}"\
-            --with-drivers=""\
+		    --with-drivers="-Wl,-u,flyingbergman_ko,-u,stm32_spi_ko,-u,console_ko,-u,mcp2317_ko,-u,stm32_cpuinfo_ko,-u,stm32_tim_ko,-u,drv8302_ko,-u,stm32_i2c_ko,-u,mcp4461_ko,-u,stm32_adc_ko,-u,lp55231_ko,-u,max14890_ko,-u,at24_ko,-u,stm32_can_ko,-u,vardir_ko,-u,canopen_ko,-u,regmap_ko,-u,stm32_usb_ko"\
             --with-libs="${BOSS_LDADD}"\
             CFLAGS="${BOSS_CFLAGS} ${BOSS_TARGET_CFLAGS}"\
             LDFLAGS="${BOSS_LDFLAGS} ${BOSS_TARGET_LDFLAGS}"\
@@ -136,3 +156,9 @@ if [ "${BOSS_OUTPUT_FILE##*.}" = "bin" ]; then
 elif [ "${BOSS_OUTPUT_FILE##*.}" = "hex" ]; then
    ${BOSS_TARGET_HOST}-objcopy -O ihex ${BOSS_STAGING_DIR}/bin/theboss ${BOSS_OUTPUT_FILE}
 fi
+
+if [ ! -z ${OPT_INSTALL} ]; then
+    CMD=$(echo ${BOSS_TARGET_CMD_FLASH} | sed "s+##FILE##+${BOSS_OUTPUT_FILE}+g")
+    exec $CMD
+fi
+
