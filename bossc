@@ -148,9 +148,11 @@ LIB_OPT_CONFIGURE=${OPT_CONFIGURE}
 )
 done
 
-if [ -f ${BOSS_STAGING_DIR}/bin/theboss ]; then
-	${BOSS_TARGET_HOST}-size ${BOSS_STAGING_DIR}/bin/theboss
-	cp ${BOSS_STAGING_DIR}/bin/theboss ${BOSS_OUTPUT_FILE%.*}.elf
+BOSS_ELF=${BOSS_STAGING_DIR}/bin/theboss
+if [ -f ${BOSS_ELF} ]; then
+	${BOSS_TARGET_HOST}-size ${BOSS_ELF}
+	${BOSS_TARGET_HOST}-nm ${BOSS_ELF} > $(dirname ${BOSS_OUTPUT_FILE})/${BOSS_OUTPUT_FILE%.*}.syms
+	cp ${BOSS_ELF} ${BOSS_OUTPUT_FILE%.*}.elf
 	# copy the binary file to the build directory
 	if [ "${BOSS_OUTPUT_FILE##*.}" = "bin" ]; then
 		${BOSS_TARGET_HOST}-objcopy -O binary ${BOSS_STAGING_DIR}/bin/theboss ${BOSS_OUTPUT_FILE}
