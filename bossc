@@ -107,7 +107,6 @@ BOSS_LDFLAGS="\
     -L${BOSS_STAGING_DIR}/lib"
 
 BOSS_LDADD="\
-    ${BOSS_TARGET_DRIVERS_LDADD}\
     $(echo ${BOSS_TARGET_DEPENDS} | sed 's/lib/-l/g')"
 
 mkdir -p ${BOSS_BUILD_DIR}
@@ -140,26 +139,31 @@ LIB_OPT_CONFIGURE=${OPT_CONFIGURE}
             --host="${BOSS_TARGET_HOST}"\
             --with-target="${BOSS_TARGET_TARGET}"\
             --with-devicetree="${BOSS_INPUT_FILE}"\
-		    --with-drivers="-Wl,-u,flyingbergman_ko,-u,stm32_spi_ko,-u,console_ko,-u,mcp2317_ko,-u,stm32_cpuinfo_ko,-u,stm32_tim_ko,-u,drv8302_ko,-u,stm32_i2c_ko,-u,mcp4461_ko,-u,stm32_adc_ko,-u,lp55231_ko,-u,max14890_ko,-u,at24_ko,-u,stm32_can_ko,-u,vardir_ko,-u,canopen_ko,-u,regmap_ko,-u,stm32_usb_ko"\
+		    --with-drivers="${BOSS_TARGET_DRIVERS_LDADD}"\
             --with-libs="${BOSS_LDADD}"\
             CFLAGS="${BOSS_CFLAGS} ${BOSS_TARGET_CFLAGS}"\
             LDFLAGS="${BOSS_LDFLAGS} ${BOSS_TARGET_LDFLAGS}"\
             LDADD="${BOSS_LDADD} ${BOSS_TARGET_LDADD}"\
             --prefix="${BOSS_STAGING_DIR}"
+	else
+		cd 	${LIB_BUILD_DIR}
+		make
+		make install
     fi
-    cd  ${LIB_BUILD_DIR}
-    make
-    make install
 )
 done
 
-${BOSS_TARGET_HOST}-size ${BOSS_STAGING_DIR}/bin/theboss
-
-# copy the binary file to the build directory
-if [ "${BOSS_OUTPUT_FILE##*.}" = "bin" ]; then
-   ${BOSS_TARGET_HOST}-objcopy -O binary ${BOSS_STAGING_DIR}/bin/theboss ${BOSS_OUTPUT_FILE}
-elif [ "${BOSS_OUTPUT_FILE##*.}" = "hex" ]; then
-   ${BOSS_TARGET_HOST}-objcopy -O ihex ${BOSS_STAGING_DIR}/bin/theboss ${BOSS_OUTPUT_FILE}
+BOSS_ELF=${BOSS_STAGING_DIR}/bin/theboss
+if [ -f ${BOSS_ELF} ]; then
+	${BOSS_TARGET_HOST}-size ${BOSS_ELF}
+	${BOSS_TARGET_HOST}-nm ${BOSS_ELF} > $(dirname ${BOSS_OUTPUT_FILE})/${BOSS_OUTPUT_FILE%.*}.syms
+	cp ${BOSS_ELF} ${BOSS_OUTPUT_FILE%.*}.elf
+	# copy the binary file to the build directory
+	if [ "${BOSS_OUTPUT_FILE##*.}" = "bin" ]; then
+		${BOSS_TARGET_HOST}-objcopy -O binary ${BOSS_STAGING_DIR}/bin/theboss ${BOSS_OUTPUT_FILE}
+	elif [ "${BOSS_OUTPUT_FILE##*.}" = "hex" ]; then
+		${BOSS_TARGET_HOST}-objcopy -O ihex ${BOSS_STAGING_DIR}/bin/theboss ${BOSS_OUTPUT_FILE}
+	fi
 fi
 
 if [ ! -z ${OPT_INSTALL} ]; then
