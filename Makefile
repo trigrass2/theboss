@@ -31,6 +31,9 @@ endif
 # first target is "all" so that we can defer default target to a different one we define after we have included all the files.
 all: info everything
 
+tags:
+	ctags -e -R .
+
 info:
 	@echo "PROJECT=$(PROJECT)"
 
@@ -65,4 +68,4 @@ everything: $(BUILD_TARGETS)
 clean:
 	rm -rf build_dir
 
-.PHONY=info everything clean
+.PHONY=tags info everything clean

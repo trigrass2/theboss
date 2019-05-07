@@ -31,7 +31,7 @@ done
 set -- "${INPUT_FILES[@]}" # restore positional parameters
 
 get_param(){
-    echo $(grep "\!+$2:" "$1" | sed 's/\/\/!+'${2}': \(.*\)/\1/g')
+    echo $(grep "\!+$2: " "$1" | sed 's/\/\/!+'${2}': \(.*\)/\1/g')
 }
 
 BOSS_INPUT_FILE=${INPUT_FILES}
@@ -62,6 +62,10 @@ BOSS_TARGET_DRIVERS_LDADD="-Wl,"$(grep compatible ${BOSS_INPUT_FILE} | sed 's+.*
 
 BOSS_STAGING_DIR=${BOSS_TMP_DIR}/staging/${BOSS_INPUT_FILE_NOEXT}/${BOSS_TARGET_TARGET}
 BOSS_BUILD_DIR=${BOSS_TMP_DIR}/build/${BOSS_INPUT_FILE_NOEXT}/${BOSS_TARGET_TARGET}
+
+if [ -z "${BOSS_TARGET_HOST}" ]; then
+	BOSS_TARGET_HOST="$(uname -m)"
+fi
 
 BOSS_CFLAGS="\
 	-Wall -Wextra -Werror\
@@ -155,8 +159,12 @@ done
 
 BOSS_ELF=${BOSS_STAGING_DIR}/bin/theboss
 if [ -f ${BOSS_ELF} ]; then
-	${BOSS_TARGET_HOST}-size ${BOSS_ELF}
-	${BOSS_TARGET_HOST}-nm ${BOSS_ELF} > $(dirname ${BOSS_OUTPUT_FILE})/${BOSS_OUTPUT_FILE%.*}.syms
+	if [ -f "$(which ${BOSS_TARGET_HOST}-size)" ]; then
+		${BOSS_TARGET_HOST}-size ${BOSS_ELF}
+	fi
+	if [ -f "$(which ${BOSS_TARGET_HOST}-nm)" ]; then
+		${BOSS_TARGET_HOST}-nm ${BOSS_ELF} > $(dirname ${BOSS_OUTPUT_FILE})/${BOSS_OUTPUT_FILE%.*}.syms
+	fi
 	cp ${BOSS_ELF} ${BOSS_OUTPUT_FILE%.*}.elf
 	# copy the binary file to the build directory
 	if [ "${BOSS_OUTPUT_FILE##*.}" = "bin" ]; then
