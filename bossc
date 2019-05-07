@@ -39,8 +39,13 @@ BOSS_OUTPUT_FILE=${OUTPUT_PATH}
 BOSS_TMP_DIR=/tmp/theboss
 
 if [ -z ${BOSS_INPUT_FILE} ]; then
-    echo "No input files";
+    echo $0 ": No input files";
     exit 1
+fi
+
+if [ ! -f ${BOSS_INPUT_FILE} ]; then
+    echo $0 ": ${BOSS_INPUT_FILE}: No such file or directory!";
+	exit 1
 fi
 
 BOSS_BASE_NAME=$(basename -- ${BOSS_INPUT_FILE})
