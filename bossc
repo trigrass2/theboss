@@ -124,7 +124,7 @@ LIB_OPT_CONFIGURE=${OPT_CONFIGURE}
         mkdir -p ${LIB_BUILD_DIR}
         LIB_OPT_CONFIGURE="y"
     fi
-    if [ ! -z ${LIB_OPT_CONFIGURE} ]; then
+    if [ ! -z ${LIB_OPT_CONFIGURE} ] || [ ! -f ${LIB_BUILD_DIR}/Makefile ] ; then
         cd  ${LIB_BUILD_DIR}
         # this can sometimes fail if configure script was not run properly previously so we ignore any errors
         make clean distclean || true
